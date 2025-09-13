@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diário de Peso</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --cor-principal: #1a73e8; --cor-verde: #28a745; --cor-vermelho: #dc3545; --cor-cinza: #6c757d; --cor-amarelo: #ffc107;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5; color: #333; margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box;
+        }
+        .container {
+            background-color: white; padding: 25px; border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); width: 100%;
+            max-width: 600px; box-sizing: border-box; flex-grow: 1;
+        }
+        h1, h2, h3 { text-align: center; color: var(--cor-principal); }
+        h1 { margin-top: 10px; }
+        
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); display: flex;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-box {
+            background-color: white; padding: 30px; border-radius: 10px;
+            text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            width: 90%; max-width: 350px;
+        }
+        .modal-box p { margin-top: 0; }
+
+        #user-info {
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: #f0f2f5; padding: 8px 15px; border-radius: 8px; margin-bottom: 5px;
+        }
+        #user-info span { font-weight: bold; }
+        #logout-btn { background: none; border: 1px solid var(--cor-cinza); color: var(--cor-cinza); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.9em; }
+        #welcome-message { text-align: center; color: var(--cor-cinza); margin-bottom: 20px; font-style: italic; }
+        
+        #resumo { text-align: center; margin-bottom: 25px; padding: 15px; background-color: #f9f9f9; border-radius: 8px; border: 1px solid #eee; }
+        #resumo p { margin: 10px 0; font-size: 1.1em; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; }
+        #resumo strong { font-size: 1.2em; }
+        #evolucao-detalhada { font-size: 0.9em; color: #555; margin-top: 5px; display: block; width: 100%; }
+        .perda { color: var(--cor-verde); } .ganho { color: var(--cor-vermelho); } .neutro { color: var(--cor-cinza); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="date"], input[type="number"], input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: var(--cor-principal); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #155ab6; }
+        .btn-secondary { background-color: #6c757d; } .btn-secondary:hover { background-color: #5a6268; }
+
+        .history-list ul { list-style-type: none; padding: 0; margin-top: 10px; }
+        .history-list li { background-color: #f9f9f9; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-bottom: 5px; }
+        .remover-btn { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+        .variacao-diaria { font-size: 0.9em; font-weight: bold; margin-left: 10px; }
+
+        .support-content p { margin: 0 0 15px 0; }
+        .support-content .pix-key { font-family: monospace; background-color: #fff; padding: 5px 10px; border-radius: 4px; border: 1px dashed #ccc; }
+        .support-content .copy-pix-btn { background-color: var(--cor-verde); margin-top: 15px; font-size: 1em; padding: 10px; }
+        #support-section { text-align: center; margin-top: 30px; padding: 20px; background-color: #e9ecef; border-radius: 8px; }
+        
+        footer { width: 100%; text-align: center; padding: 20px 0; margin-top: 20px; color: #888; font-size: 0.9em; }
+        footer a { color: var(--cor-principal); text-decoration: none; font-weight: bold; }
+        footer a:hover { text-decoration: underline; }
+        
+        #edit-meta-btn { background: none; border: none; cursor: pointer; margin-left: 8px; padding: 0; font-size: 1.1em; }
+        #imc-atual { padding: 2px 8px; border-radius: 10px; color: white; font-size: 0.9em; font-weight: bold; }
+        .imc-magreza { background-color: var(--cor-amarelo); color: #333 !important; }
+        .imc-normal { background-color: var(--cor-verde); }
+        .imc-sobrepeso { background-color: var(--cor-amarelo); color: #333 !important; }
+        .imc-obesidade { background-color: var(--cor-vermelho); }
+    </style>
+</head>
+<body>
+    
+    <div id="login-overlay" class="overlay" style="display: none;">
+        <div class="modal-box">
+            <h3>Bem-vindo(a) ao Diário de Peso!</h3>
+            <p>Para começar, preencha seus dados.</p>
+            <form id="login-form">
+                <div class="form-group"><input type="text" id="name-input" placeholder="Seu nome" required autofocus></div>
+                <div class="form-group"><input type="number" step="0.01" id="height-input" placeholder="Sua altura em metros (Ex: 1.75)"></div>
+                <button type="submit" style="margin-top: 15px;">Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="meta-overlay" class="overlay" style="display: none;">
+        <div class="modal-box">
+            <h3>Definir Meta de Peso</h3>
+            <form id="meta-form">
+                <div class="form-group"><input type="number" step="0.1" id="meta-input" placeholder="Peso desejado (Ex: 70.5)" required></div>
+                <button type="submit">Salvar Meta</button>
+                <button type="button" id="cancel-meta-btn" class="btn-secondary" style="margin-top: 10px;">Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="donation-overlay" class="overlay" style="display: none;">
+        <div class="modal-box">
+            <h3>Obrigado por usar o Diário de Peso!</h3>
+            <p>Este é um projeto desenvolvido com carinho. Se ele tem sido útil para você, considere apoiar com um PIX de qualquer valor.</p>
+            <div class="support-content">
+                <p>Chave: <span class="pix-key">4716124e-6815-4f85-8248-d58f9c0822f8</span></p>
+                <button class="copy-pix-btn">Copiar Chave PIX</button>
+            </div>
+            <button type="button" id="close-donation-btn" class="btn-secondary" style="margin-top: 10px;">Fechar</button>
+        </div>
+    </div>
+
+    <div class="container" style="display: none;">
+        <div id="user-info">
+            <span id="user-greeting"></span>
+            <button id="logout-btn">Trocar Usuário</button>
+        </div>
+        <p id="welcome-message"></p>
+        <h1>Meu Diário de Peso</h1>
+        <div id="resumo">
+            <h2>Resumo da Evolução</h2>
+            <p><strong>Peso Inicial:</strong>&nbsp;<span id="peso-inicial">-- kg</span></p>
+            <p><strong>Peso Atual:</strong>&nbsp;<span id="peso-atual">-- kg</span></p>
+            <p><strong>IMC Atual:</strong>&nbsp;<span id="imc-atual">--</span></p>
+            <p><strong style="color: var(--cor-principal);">Evolução Total:</strong>&nbsp;<span id="evolucao-total" class="neutro">Registre seu peso</span></p>
+            <p id="evolucao-detalhada" style="display: none;"></p>
+            <p><strong>Meta de Peso:</strong>&nbsp;<span id="meta-peso">-- kg</span><button id="edit-meta-btn">✏️</button></p>
+            <p id="falta-meta"></p>
+        </div>
+        <form id="form-peso">
+            <div class="form-group"><label for="data">Data:</label><input type="date" id="data" required></div>
+            <div class="form-group"><label for="peso">Peso (kg):</label><input type="number" id="peso" step="0.01" placeholder="Ex: 65.55" required></div>
+            <button type="submit">Salvar Registro</button>
+        </form>
+        <div id="ultimos-registros-container" class="history-list" style="display: none;">
+            <hr style="margin: 25px 0;"><h2 >Últimos 5 Registros</h2>
+            <div id="ultimos-registros"><ul></ul></div>
+        </div>
+        <div id="grafico-container" style="display: none;"><hr style="margin: 25px 0;"><h2>Gráfico de Progresso</h2><canvas id="graficoPeso"></canvas></div>
+        <div id="historico-completo-container" style="display: none;">
+            <hr style="margin: 25px 0;">
+            <button id="toggle-history-btn" class="btn-secondary">Mostrar Histórico Completo</button>
+            <div id="historico-list-wrapper" class="history-list" style="display: none; margin-top: 15px;"><ul></ul></div>
+        </div>
+        <div id="support-section" class="support-content">
+            <hr style="margin: 25px 0;"><h3>Gostou do App?</h3>
+            <p>Apoie este projeto com um PIX!</p>
+            <p>Chave: <span class="pix-key">4716124e-6815-4f85-8248-d58f9c0822f8</span></p>
+            <button class="copy-pix-btn">Copiar Chave PIX</button>
+        </div>
+    </div>
+
+    <footer style="display: none;">
+        Desenvolvido por <a href="https://wa.me/5519993562075" target="_blank" rel="noopener noreferrer">Valdinei Rodrigues</a>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- ETAPA 1: SELEÇÃO DE TODOS OS ELEMENTOS ---
+            const loginOverlay = document.getElementById('login-overlay');
+            const loginForm = document.getElementById('login-form');
+            const nameInput = document.getElementById('name-input');
+            const heightInput = document.getElementById('height-input');
+            const mainContainer = document.querySelector('.container');
+            const footer = document.querySelector('footer');
+            const userGreeting = document.getElementById('user-greeting');
+            const welcomeMessage = document.getElementById('welcome-message');
+            const logoutBtn = document.getElementById('logout-btn');
+            const donationOverlay = document.getElementById('donation-overlay');
+            const closeDonationBtn = document.getElementById('close-donation-btn');
+
+            // --- ETAPA 2: DEFINIÇÃO DE TODAS AS FUNÇÕES ---
+            
+            const getDadosUsuario = (userName) => JSON.parse(localStorage.getItem(`dadosUsuario_${userName}`));
+            const salvarDadosUsuario = (userName, data) => localStorage.setItem(`dadosUsuario_${userName}`, JSON.stringify(data));
+            const getPesosSalvos = (userName) => JSON.parse(localStorage.getItem(`registrosDePeso_${userName}`)) || [];
+            const salvarPesos = (userName, pesos) => localStorage.setItem(`registrosDePeso_${userName}`, JSON.stringify(pesos));
+            const formatarData = (dataString) => {
+                const data = new Date(dataString);
+                const options = { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' };
+                let dataFormatada = new Intl.DateTimeFormat('pt-BR', options).format(data);
+                return dataFormatada.charAt(0).toUpperCase() + dataFormatada.slice(1);
+            };
+
+            const showApp = (userName) => {
+                loginOverlay.style.display = 'none';
+                mainContainer.style.display = 'block';
+                footer.style.display = 'block';
+                userGreeting.textContent = `Usuário: ${userName}`;
+                welcomeMessage.textContent = `Seja bem-vindo(a)!`;
+                iniciarApp(userName);
+            };
+
+            function iniciarApp(userName) {
+                const userDataOnStart = getDadosUsuario(userName);
+                if (userDataOnStart && userDataOnStart.dataPrimeiroUso && !userDataOnStart.popupDoacaoMostrado) {
+                    const dataPrimeiroUso = new Date(userDataOnStart.dataPrimeiroUso);
+                    const hoje = new Date();
+                    const diffTime = Math.abs(hoje - dataPrimeiroUso);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays > 30) {
+                        donationOverlay.style.display = 'flex';
+                        userDataOnStart.popupDoacaoMostrado = true;
+                        salvarDadosUsuario(userName, userDataOnStart);
+                    }
+                }
+
+                const form = document.getElementById('form-peso');
+                const inputData = document.getElementById('data');
+                const inputPeso = document.getElementById('peso');
+                const spanPesoInicial = document.getElementById('peso-inicial');
+                const spanPesoAtual = document.getElementById('peso-atual');
+                const strongEvolucaoTotal = document.getElementById('evolucao-total');
+                const pEvolucaoDetalhada = document.getElementById('evolucao-detalhada');
+                const graficoContainer = document.getElementById('grafico-container');
+                const ctx = document.getElementById('graficoPeso').getContext('2d');
+                const ultimosRegistrosContainer = document.getElementById('ultimos-registros-container');
+                const listaUltimosRegistros = document.querySelector('#ultimos-registros ul');
+                const historicoCompletoContainer = document.getElementById('historico-completo-container');
+                const toggleHistoryBtn = document.getElementById('toggle-history-btn');
+                const historyListWrapper = document.getElementById('historico-list-wrapper');
+                const listaHistoricoCompleto = historyListWrapper.querySelector('ul');
+                const spanImc = document.getElementById('imc-atual');
+                const spanMeta = document.getElementById('meta-peso');
+                const spanFaltaMeta = document.getElementById('falta-meta');
+                const editMetaBtn = document.getElementById('edit-meta-btn');
+                const metaOverlay = document.getElementById('meta-overlay');
+                const metaForm = document.getElementById('meta-form');
+                const metaInput = document.getElementById('meta-input');
+                const cancelMetaBtn = document.getElementById('cancel-meta-btn');
+                inputData.valueAsDate = new Date();
+                let grafico; 
+
+                editMetaBtn.addEventListener('click', () => { metaOverlay.style.display = 'flex'; });
+                cancelMetaBtn.addEventListener('click', () => { metaOverlay.style.display = 'none'; });
+                metaForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    let userData = getDadosUsuario(userName) || {};
+                    userData.meta = parseFloat(metaInput.value);
+                    salvarDadosUsuario(userName, userData);
+                    metaOverlay.style.display = 'none';
+                    atualizarTela();
+                });
+
+                const getClassificacaoIMC = (imc) => {
+                    if (!imc) return { texto: '--', classe: '' };
+                    if (imc < 18.5) return { texto: 'Magreza', classe: 'imc-magreza' };
+                    if (imc < 24.9) return { texto: 'Normal', classe: 'imc-normal' };
+                    if (imc < 29.9) return { texto: 'Sobrepeso', classe: 'imc-sobrepeso' };
+                    return { texto: 'Obesidade', classe: 'imc-obesidade' };
+                };
+
+                function atualizarTela() {
+                    const pesos = getPesosSalvos(userName);
+                    pesos.sort((a, b) => new Date(a.data) - new Date(b.data));
+                    const userData = getDadosUsuario(userName) || {};
+                    const altura = userData ? userData.altura : null;
+                    const meta = userData ? userData.meta : null;
+
+                    const temRegistros = pesos.length > 0;
+                    const temMaisDeUmRegistro = pesos.length > 1;
+                    graficoContainer.style.display = temMaisDeUmRegistro ? 'block' : 'none';
+                    ultimosRegistrosContainer.style.display = temMaisDeUmRegistro ? 'block' : 'none';
+                    pEvolucaoDetalhada.style.display = temMaisDeUmRegistro ? 'block' : 'none';
+                    historicoCompletoContainer.style.display = temRegistros ? 'block' : 'none';
+
+                    const pesoAtual = temRegistros ? pesos[pesos.length - 1].peso : null;
+                    if(altura && pesoAtual) {
+                        const imc = pesoAtual / (altura * altura);
+                        const classificacao = getClassificacaoIMC(imc);
+                        spanImc.textContent = `${imc.toFixed(1)} - ${classificacao.texto}`;
+                        spanImc.className = classificacao.classe;
+                    } else if (!altura && temRegistros) {
+                        spanImc.textContent = 'Adicione sua altura';
+                        spanImc.className = 'neutro';
+                    } else {
+                        spanImc.textContent = '--'; spanImc.className = '';
+                    }
+
+                    if(meta) {
+                        spanMeta.textContent = `${meta.toFixed(2)} kg`;
+                        if(pesoAtual) {
+                            const falta = pesoAtual - meta;
+                            if(falta > 0.05) { spanFaltaMeta.textContent = `Faltam ${falta.toFixed(2)} kg para a sua meta!`; } 
+                            else if (falta < -0.05) { spanFaltaMeta.textContent = `Você passou ${Math.abs(falta).toFixed(2)} kg da sua meta!`; } 
+                            else { spanFaltaMeta.textContent = 'Parabéns, você atingiu sua meta! 🎉'; }
+                        } else { spanFaltaMeta.textContent = ''; }
+                    } else {
+                        spanMeta.textContent = 'Nenhuma'; spanFaltaMeta.textContent = 'Clique no lápis para definir.';
+                    }
+
+                    if (!temRegistros) {
+                        spanPesoInicial.textContent = '-- kg'; spanPesoAtual.textContent = '-- kg';
+                        strongEvolucaoTotal.textContent = 'Registre seu peso para começar'; strongEvolucaoTotal.className = 'neutro';
+                    } else if (!temMaisDeUmRegistro) {
+                        const pesoUnico = pesos[0].peso.toFixed(2);
+                        spanPesoInicial.textContent = `${pesoUnico} kg`; spanPesoAtual.textContent = `${pesoUnico} kg`;
+                        strongEvolucaoTotal.textContent = 'Registre mais um peso para ver a evolução'; strongEvolucaoTotal.className = 'neutro';
+                    } else {
+                        const pesoInicial = pesos[0].peso; const diferencaKg = pesoAtual - pesoInicial; const diferencaGramas = Math.round(diferencaKg * 1000);
+                        spanPesoInicial.textContent = `${pesoInicial.toFixed(2)} kg`; spanPesoAtual.textContent = `${pesoAtual.toFixed(2)} kg`;
+                        if (diferencaKg < 0) {
+                            strongEvolucaoTotal.textContent = `Você perdeu ${Math.abs(diferencaKg).toFixed(2)} kg! 🎉`; strongEvolucaoTotal.className = 'perda';
+                            pEvolucaoDetalhada.textContent = `(Equivalente a ${Math.abs(diferencaGramas).toLocaleString('pt-BR')} g)`;
+                        } else if (diferencaKg > 0) {
+                            strongEvolucaoTotal.textContent = `Você ganhou ${diferencaKg.toFixed(2)} kg`; strongEvolucaoTotal.className = 'ganho';
+                            pEvolucaoDetalhada.textContent = `(Equivalente a ${diferencaGramas.toLocaleString('pt-BR')} g)`;
+                        } else {
+                            strongEvolucaoTotal.textContent = 'Seu peso se manteve igual'; strongEvolucaoTotal.className = 'neutro';
+                            pEvolucaoDetalhada.style.display = 'none';
+                        }
+                    }
+
+                    if(temMaisDeUmRegistro) {
+                        listaUltimosRegistros.innerHTML = '';
+                        const ultimos5 = pesos.slice(-5).reverse();
+                        ultimos5.forEach(registro => {
+                            const li = document.createElement('li');
+                            const indexAtual = pesos.findIndex(p => p.data === registro.data && p.peso === registro.peso);
+                            let variacaoHtml = '';
+                            if (indexAtual > 0) {
+                                const pesoAnterior = pesos[indexAtual - 1].peso;
+                                const variacao = (registro.peso - pesoAnterior) * 1000;
+                                if(Math.abs(variacao) > 0) {
+                                    const sinal = variacao > 0 ? '+' : ''; const classe = variacao > 0 ? 'ganho' : 'perda';
+                                    variacaoHtml = `<span class="variacao-diaria ${classe}">(${sinal}${Math.round(variacao)} g)</span>`;
+                                }
+                            }
+                            li.innerHTML = `<div><strong>${formatarData(registro.data)}</strong></div><div>${registro.peso.toFixed(2)} kg ${variacaoHtml}</div>`;
+                            listaUltimosRegistros.appendChild(li);
+                        });
+                    }
+
+                    listaHistoricoCompleto.innerHTML = '';
+                    [...pesos].reverse().forEach((registro, index) => {
+                        const li = document.createElement('li');
+                        const originalIndex = pesos.length - 1 - index;
+                        li.innerHTML = `<span><strong>${formatarData(registro.data)}</strong> - ${registro.peso.toFixed(2)} kg</span><button class="remover-btn" data-index="${originalIndex}">Remover</button>`;
+                        listaHistoricoCompleto.appendChild(li);
+                    });
+                    
+                    if (grafico) { grafico.destroy(); }
+                    if (temMaisDeUmRegistro) {
+                        const labels = pesos.map(p => new Date(p.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'}));
+                        const data = pesos.map(p => p.peso);
+                        grafico = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ label: 'Peso (kg)', data, borderColor: 'var(--cor-principal)', backgroundColor: 'rgba(26, 115, 232, 0.1)', fill: true, tension: 0.1 }] }, options: { scales: { y: { beginAtZero: false } } } });
+                    }
+                }
+
+                form.addEventListener('submit', (e) => { e.preventDefault(); const p = getPesosSalvos(userName); p.push({ data: inputData.value, peso: parseFloat(inputPeso.value) }); salvarPesos(userName, p); form.reset(); inputData.valueAsDate = new Date(); atualizarTela(); });
+                historyListWrapper.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('remover-btn')) {
+                        const index = parseInt(e.target.getAttribute('data-index')); let p = getPesosSalvos(userName); p.splice(index, 1); salvarPesos(userName, p); atualizarTela();
+                    }
+                });
+                toggleHistoryBtn.addEventListener('click', () => {
+                    const isHidden = historyListWrapper.style.display === 'none';
+                    historyListWrapper.style.display = isHidden ? 'block' : 'none';
+                    toggleHistoryBtn.textContent = isHidden ? 'Ocultar Histórico Completo' : 'Mostrar Histórico Completo';
+                });
+
+                atualizarTela();
+            }
+            
+            // --- ETAPA 3: EXECUÇÃO DA LÓGICA INICIAL E LISTENERS GLOBAIS ---
+            let currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                const userData = getDadosUsuario(currentUser) || {};
+                nameInput.value = currentUser;
+                if (userData.altura) {
+                    heightInput.placeholder = `Altura salva: ${userData.altura} m`;
+                    heightInput.value = '';
+                }
+                showApp(currentUser);
+            } else {
+                loginOverlay.style.display = 'flex';
+            }
+
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const userName = nameInput.value.trim();
+                const userHeight = parseFloat(heightInput.value);
+                if (userName) {
+                    localStorage.setItem('currentUser', userName);
+                    currentUser = userName;
+                    let userData = getDadosUsuario(userName) || {};
+                    if (!userData.dataPrimeiroUso) {
+                        userData.dataPrimeiroUso = new Date().toISOString();
+                    }
+                    if(userHeight && !isNaN(userHeight)) {
+                        userData.altura = userHeight;
+                    }
+                    salvarDadosUsuario(userName, userData);
+                    showApp(currentUser);
+                }
+            });
+
+            logoutBtn.addEventListener('click', () => {
+                localStorage.removeItem('currentUser');
+                location.reload();
+            });
+
+            closeDonationBtn.addEventListener('click', () => {
+                donationOverlay.style.display = 'none';
+            });
+
+            document.querySelectorAll('.copy-pix-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const pixKeySpan = button.parentElement.querySelector('.pix-key');
+                    navigator.clipboard.writeText(pixKeySpan.textContent).then(() => {
+                        button.textContent = 'Copiado!';
+                        setTimeout(() => { button.textContent = 'Copiar Chave PIX'; }, 2000);
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
