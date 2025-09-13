@@ -265,7 +265,7 @@
                     metaOverlay.style.display = 'none';
                     atualizarTela();
                     // --- LÓGICA DE BACKUP E RESTAURAÇÃO ---
-                exportBtn.addEventListener('click', () => {
+               exportBtn.addEventListener('click', () => {
                     const userData = getDadosUsuario(userName);
                     const weightData = getPesosSalvos(userName);
 
@@ -287,10 +287,15 @@
                     const link = document.createElement('a');
                     link.href = url;
                     link.download = `backup_diario_de_peso_${userName}.json`;
+                    
                     document.body.appendChild(link);
                     link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
+                    
+                    // A MUDANÇA ESTÁ AQUI: Limpamos o link após uma pequena pausa
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    }, 100); // 100 milissegundos é o suficiente
                 });
 
                 importBtn.addEventListener('click', () => {
