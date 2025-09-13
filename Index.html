@@ -75,6 +75,14 @@
         .imc-normal { background-color: var(--cor-verde); }
         .imc-sobrepeso { background-color: var(--cor-amarelo); color: #333 !important; }
         .imc-obesidade { background-color: var(--cor-vermelho); }
+
+        #backup-section {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -153,6 +161,14 @@
             <button class="copy-pix-btn">Copiar Chave PIX</button>
         </div>
     </div>
+    <div id="backup-section">
+            <hr style="margin: 25px 0;">
+            <h3>Backup e Restauração de Dados</h3>
+            <p style="font-size: 0.9em; color: #555;">Salve seus dados em um arquivo para não perdê-los ou para transferi-los para outro aparelho.</p>
+            <button id="export-btn">Exportar Dados (Backup)</button>
+            <button id="import-btn" class="btn-secondary" style="margin-top: 10px;">Importar Dados (Restaurar)</button>
+            <input type="file" id="import-file-input" style="display: none;" accept=".json, .txt">
+        </div>
 
     <footer style="display: none;">
         Desenvolvido por <a href="https://wa.me/5519993562075" target="_blank" rel="noopener noreferrer">Valdinei Rodrigues</a>
@@ -197,6 +213,9 @@
             };
 
             function iniciarApp(userName) {
+                const exportBtn = document.getElementById('export-btn');
+                const importBtn = document.getElementById('import-btn');
+                const importFileInput = document.getElementById('import-file-input');
                 const userDataOnStart = getDadosUsuario(userName);
                 if (userDataOnStart && userDataOnStart.dataPrimeiroUso && !userDataOnStart.popupDoacaoMostrado) {
                     const dataPrimeiroUso = new Date(userDataOnStart.dataPrimeiroUso);
@@ -245,6 +264,75 @@
                     salvarDadosUsuario(userName, userData);
                     metaOverlay.style.display = 'none';
                     atualizarTela();
+                    // --- LÓGICA DE BACKUP E RESTAURAÇÃO ---
+                exportBtn.addEventListener('click', () => {
+                    const userData = getDadosUsuario(userName);
+                    const weightData = getPesosSalvos(userName);
+
+                    if (!userData && (!weightData || weightData.length === 0)) {
+                        alert('Não há dados para exportar!');
+                        return;
+                    }
+
+                    const allData = {
+                        user: userName,
+                        userData: userData || {},
+                        weightData: weightData || []
+                    };
+
+                    const dataStr = JSON.stringify(allData, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    const url = URL.createObjectURL(dataBlob);
+                    
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `backup_diario_de_peso_${userName}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                });
+
+                importBtn.addEventListener('click', () => {
+                    importFileInput.click(); // Abre a janela de seleção de arquivo
+                });
+
+                importFileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (!file) {
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const importedData = JSON.parse(e.target.result);
+                            
+                            if (!importedData.user || importedData.userData === undefined || importedData.weightData === undefined) {
+                                throw new Error('Arquivo de backup inválido ou corrompido.');
+                            }
+                            
+                            if (importedData.user !== userName) {
+                                if (!confirm(`Atenção: este backup pertence ao usuário "${importedData.user}".\n\nDeseja importar estes dados para o seu perfil "${userName}"?`)) {
+                                    importFileInput.value = ''; // Limpa o input
+                                    return;
+                                }
+                            }
+
+                            if (confirm('Atenção: A importação irá substituir TODOS os seus dados atuais. Esta ação não pode ser desfeita. Deseja continuar?')) {
+                                salvarDadosUsuario(userName, importedData.userData);
+                                salvarPesos(userName, importedData.weightData);
+                                alert('Dados importados com sucesso!');
+                                location.reload(); // Recarrega a página para garantir que tudo seja atualizado
+                            }
+                        } catch (error) {
+                            alert('Erro ao importar o arquivo. Verifique se o arquivo é um backup válido.\n\nDetalhe: ' + error.message);
+                        } finally {
+                            importFileInput.value = '';
+                        }
+                    };
+                    reader.readAsText(file);
+                });
                 });
 
                 const getClassificacaoIMC = (imc) => {
