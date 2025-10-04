@@ -5,22 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diário de Peso</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/jspdf-autotable@latest/dist/jspdf.plugin.autotable.js"></script>
     
     <style>
         :root {
+            /* Tema Claro (Padrão) */
             --cor-principal: #1a73e8; --cor-verde: #28a745; --cor-vermelho: #dc3545; --cor-cinza: #6c757d; --cor-amarelo: #ffc107;
+            --cor-fundo: #f0f2f5;
+            --cor-container: white;
+            --cor-texto: #333;
+            --cor-fundo-item-lista: #f9f9f9;
+            --cor-fundo-secao: #e9ecef;
+            --cor-borda: #ccc;
+            --cor-ouro: #ffc107;
         }
+
+        body.dark-mode {
+            /* Tema Escuro */
+            --cor-principal: #bb86fc; --cor-verde: #03dac6; --cor-vermelho: #cf6679; --cor-cinza: #adb5bd; --cor-amarelo: #ffd600;
+            --cor-fundo: #121212;
+            --cor-container: #1e1e1e;
+            --cor-texto: #e0e0e0;
+            --cor-fundo-item-lista: #2c2c2c;
+            --cor-fundo-secao: #2c2c2c;
+            --cor-borda: #444;
+            --cor-ouro: #ffd600;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f2f5; color: #333; margin: 0; padding: 20px;
+            background-color: var(--cor-fundo); 
+            color: var(--cor-texto); 
+            margin: 0; padding: 20px;
             display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box;
+            transition: background-color 0.3s, color 0.3s;
         }
         .container {
-            background-color: white; padding: 25px; border-radius: 10px;
+            background-color: var(--cor-container); 
+            padding: 25px; border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); width: 100%;
             max-width: 600px; box-sizing: border-box; flex-grow: 1;
+            transition: background-color 0.3s;
         }
-        h1, h2, h3 { text-align: center; color: var(--cor-principal); }
+        h1, h2, h3 { text-align: center; color: var(--cor-principal); transition: color 0.3s;}
         h1 { margin-top: 10px; }
         
         .overlay {
@@ -29,102 +57,138 @@
             justify-content: center; align-items: center; z-index: 1000;
         }
         .modal-box {
-            background-color: white; padding: 30px; border-radius: 10px;
+            background-color: var(--cor-container); 
+            padding: 20px; border-radius: 10px;
             text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            width: 90%; max-width: 350px;
+            width: 90%; max-width: 500px; display: flex; flex-direction: column;
         }
-        .modal-box p { margin-top: 0; }
+        .modal-box p { margin-top: 0; text-align: left; line-height: 1.5; }
+        .modal-box h3 { margin-top: 0; }
 
         #user-info {
-            display: flex; justify-content: space-between; align-items: center;
-            background-color: #f0f2f5; padding: 8px 15px; border-radius: 8px; margin-bottom: 5px;
+            display: grid;
+            grid-template-columns: auto auto 1fr auto auto;
+            gap: 10px;
+            align-items: center;
+            background-color: var(--cor-fundo); padding: 8px 15px; border-radius: 8px; margin-bottom: 5px;
+            transition: background-color 0.3s;
         }
-        #user-info span { font-weight: bold; }
-        #logout-btn { background: none; border: 1px solid var(--cor-cinza); color: var(--cor-cinza); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.9em; }
-        #welcome-message { text-align: center; color: var(--cor-cinza); margin-bottom: 20px; font-style: italic; }
+        #user-info span { font-weight: bold; text-align: center; }
+        #logout-btn { background: none; border: 1px solid var(--cor-cinza); color: var(--cor-cinza); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.9em; justify-self: end; }
         
-        #resumo { text-align: center; margin-bottom: 25px; padding: 15px; background-color: #f9f9f9; border-radius: 8px; border: 1px solid #eee; }
+        #theme-toggle-btn, #achievements-btn, #shopping-list-btn {
+            background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0 5px;
+            line-height: 1; 
+            color: var(--cor-texto);
+        }
+        
+        /* ESTILOS DA LISTA DE COMPRAS */
+        .shopping-tabs { display: flex; border-bottom: 1px solid var(--cor-borda); margin-bottom: 15px; }
+        .shopping-tab { padding: 10px 15px; cursor: pointer; border: none; background: none; color: var(--cor-cinza); font-size: 1em; }
+        .shopping-tab.active { color: var(--cor-principal); border-bottom: 2px solid var(--cor-principal); font-weight: bold; }
+        .shopping-content { display: none; }
+        .shopping-content.active { display: block; }
+        #shopping-list-form { display: grid; grid-template-columns: 1fr 80px 80px; gap: 10px; margin-bottom: 15px; }
+        .shopping-list-container, #shopping-history-list { list-style-type: none; padding: 0; max-height: 45vh; overflow-y: auto; text-align: left; }
+        .shopping-list-container li { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid var(--cor-borda); cursor: pointer; }
+        .shopping-list-container li:hover { background-color: var(--cor-fundo-item-lista); }
+        .shopping-item-text { flex-grow: 1; transition: opacity 0.3s; }
+        .shopping-item-text.done { text-decoration: line-through; opacity: 0.5; }
+        .shopping-item-quantity { font-weight: bold; margin-right: 10px; }
+        .shopping-item-price { margin: 0 10px; color: var(--cor-cinza); }
+        .delete-item-btn { background: none; border: none; color: var(--cor-vermelho); font-size: 1.2rem; cursor: pointer; padding: 5px; margin-left: 10px;}
+        #shopping-list-total { text-align: right; font-size: 1.2em; font-weight: bold; margin-top: 15px; padding: 10px; background-color: var(--cor-fundo-item-lista); border-radius: 8px; }
+        .history-purchase-item { background-color: var(--cor-fundo-item-lista); margin-bottom: 10px; border-radius: 8px; padding: 15px; }
+        .history-purchase-summary { display: flex; justify-content: space-between; align-items: center; font-weight: bold; cursor: pointer; }
+        .history-purchase-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--cor-borda); }
+        .history-purchase-details ul { list-style-type: disc; padding-left: 20px; }
+        .history-purchase-details li { margin-bottom: 5px; }
+        .shopping-actions { display: flex; gap: 10px; margin-top: 15px; }
+
+        /* O resto do seu CSS continua aqui, sem alterações... */
+        #welcome-message { text-align: center; color: var(--cor-cinza); margin-bottom: 20px; font-style: italic; }
+        #resumo { text-align: center; margin-bottom: 25px; padding: 15px; background-color: var(--cor-fundo-item-lista); border-radius: 8px; border: 1px solid var(--cor-borda); transition: background-color 0.3s, border-color 0.3s;}
         #resumo p { margin: 10px 0; font-size: 1.1em; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; }
         #resumo strong { font-size: 1.2em; }
-        #evolucao-detalhada { font-size: 0.9em; color: #555; margin-top: 5px; display: block; width: 100%; }
+        #evolucao-detalhada { font-size: 0.9em; color: var(--cor-cinza); margin-top: 5px; display: block; width: 100%; }
         .perda { color: var(--cor-verde); } .ganho { color: var(--cor-vermelho); } .neutro { color: var(--cor-cinza); }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="date"], input[type="number"], input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        input[type="date"], input[type="number"], input[type="text"] { width: 100%; padding: 10px; border: 1px solid var(--cor-borda); border-radius: 5px; box-sizing: border-box; background-color: var(--cor-container); color: var(--cor-texto); transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
         button { width: 100%; padding: 12px; background-color: var(--cor-principal); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
-        button:hover { background-color: #155ab6; }
-        .btn-secondary { background-color: #6c757d; } .btn-secondary:hover { background-color: #5a6268; }
-
+        button:hover { opacity: 0.8; }
         .history-list ul { list-style-type: none; padding: 0; margin-top: 10px; }
-        .history-list li { background-color: #f9f9f9; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-bottom: 5px; }
-        .remover-btn { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+        .history-list li { background-color: var(--cor-fundo-item-lista); padding: 10px 15px; display: block; border-radius: 4px; margin-bottom: 5px; transition: background-color 0.3s; }
+        .history-item-main { display: flex; justify-content: space-between; align-items: center; }
+        .note-display { font-size: 0.85em; color: var(--cor-cinza); font-style: italic; margin-top: 5px; border-top: 1px dashed var(--cor-borda); padding-top: 5px; word-wrap: break-word; text-align: left; }
+        .remover-btn { background-color: var(--cor-vermelho); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
         .variacao-diaria { font-size: 0.9em; font-weight: bold; margin-left: 10px; }
-
-        .support-content p { margin: 0 0 15px 0; }
-        .support-content .pix-key { font-family: monospace; background-color: #fff; padding: 5px 10px; border-radius: 4px; border: 1px dashed #ccc; }
+        .support-content p { margin: 0 0 15px 0; text-align: center;}
+        .support-content .pix-key { font-family: monospace; background-color: var(--cor-fundo); padding: 5px 10px; border-radius: 4px; border: 1px dashed var(--cor-borda); }
         .support-content .copy-pix-btn { background-color: var(--cor-verde); margin-top: 15px; font-size: 1em; padding: 10px; }
-        #support-section { text-align: center; margin-top: 30px; padding: 20px; background-color: #e9ecef; border-radius: 8px; }
-        
+        #support-section, #backup-section { text-align: center; margin-top: 30px; padding: 20px; background-color: var(--cor-fundo-secao); border-radius: 8px; transition: background-color 0.3s;}
         footer { width: 100%; text-align: center; padding: 20px 0; margin-top: 20px; color: #888; font-size: 0.9em; }
         footer a { color: var(--cor-principal); text-decoration: none; font-weight: bold; }
-        footer a:hover { text-decoration: underline; }
-        
         #edit-meta-btn { background: none; border: none; cursor: pointer; margin-left: 8px; padding: 0; font-size: 1.1em; }
         #imc-atual { padding: 2px 8px; border-radius: 10px; color: white; font-size: 0.9em; font-weight: bold; }
         .imc-magreza { background-color: var(--cor-amarelo); color: #333 !important; }
         .imc-normal { background-color: var(--cor-verde); }
         .imc-sobrepeso { background-color: var(--cor-amarelo); color: #333 !important; }
         .imc-obesidade { background-color: var(--cor-vermelho); }
-
-        #backup-section {
-            text-align: center;
-            margin-top: 30px;
-            padding: 20px;
-            background-color: #e9ecef;
-            border-radius: 8px;
-        }
+        #achievements-list { max-height: 60vh; overflow-y: auto; padding-right: 10px; }
+        .achievement-item { display: flex; align-items: center; background-color: var(--cor-fundo); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid var(--cor-cinza); transition: all 0.3s; }
+        .achievement-item.unlocked { border-left-color: var(--cor-ouro); }
+        .achievement-item.locked { opacity: 0.5; }
+        .achievement-icon { font-size: 2rem; margin-right: 15px; }
+        .achievement-details { text-align: left; }
+        .achievement-details h4 { margin: 0; color: var(--cor-texto); }
+        .achievement-details p { margin: 0; font-size: 0.85em; color: var(--cor-cinza); }
+        #toast-notification { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background-color: var(--cor-ouro); color: #333; padding: 15px 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 2000; font-weight: bold; opacity: 0; visibility: hidden; transition: opacity 0.5s, visibility 0.5s, bottom 0.5s; }
+        #toast-notification.show { bottom: 40px; opacity: 1; visibility: visible; }
     </style>
 </head>
 <body>
     
-    <div id="login-overlay" class="overlay" style="display: none;">
+    <div id="welcome-banner-overlay" class="overlay" style="display: none;"><div class="modal-box"><h3>Bem-vindo(a) ao Diário de Peso!</h3><p>Este aplicativo é <strong>100% gratuito</strong> e foi criado para te ajudar a acompanhar suas metas de saúde com privacidade.</p><p><strong>Atenção:</strong> Seus dados são salvos apenas no seu aparelho (celular/PC). Se você limpar o histórico do navegador ou trocar de aparelho, os dados podem ser perdidos.</p><p>✅ **Recomendação:** Use a função de **"Backup e Restauração de Dados"** (no final da página) regularmente para salvar seu progresso em um arquivo seguro!</p><hr><p style="text-align: center; font-size: 0.9em;">Se este app te ajudar, considere apoiar o desenvolvedor com um PIX de qualquer valor para que ele continue melhorando a ferramenta.</p><div class="support-content"><p>Chave PIX: <span class="pix-key">4716124e-6815-4f85-8248-d58f9c0822f8</span></p></div><button type="button" id="close-welcome-banner-btn" style="margin-top: 15px;">Entendi, começar a usar!</button></div></div>
+    <div id="login-overlay" class="overlay" style="display: none;"><div class="modal-box"><h3>Bem-vindo(a) ao Diário de Peso!</h3><p>Para começar, preencha seus dados.</p><form id="login-form"><div class="form-group"><input type="text" id="name-input" placeholder="Seu nome" required autofocus></div><div class="form-group"><input type="number" step="0.01" id="height-input" placeholder="Sua altura em metros (Ex: 1.75)"></div><button type="submit" style="margin-top: 15px;">Entrar</button></form></div></div>
+    <div id="meta-overlay" class="overlay" style="display: none;"><div class="modal-box"><h3>Definir Meta de Peso</h3><form id="meta-form"><div class="form-group"><input type="number" step="0.1" id="meta-input" placeholder="Peso desejado (Ex: 70.5)" required></div><button type="submit">Salvar Meta</button><button type="button" id="cancel-meta-btn" class="btn-secondary" style="margin-top: 10px;">Cancelar</button></form></div></div>
+    <div id="donation-overlay" class="overlay" style="display: none;"><div class="modal-box"><h3>Obrigado por usar o Diário de Peso!</h3><p>Considere apoiar com um PIX de qualquer valor.</p><div class="support-content"><p>Chave: <span class="pix-key">4716124e-6815-4f85-8248-d58f9c0822f8</span></p><button class="copy-pix-btn">Copiar Chave PIX</button></div><button type="button" id="close-donation-btn" class="btn-secondary" style="margin-top: 10px;">Fechar</button></div></div>
+    <div id="achievements-overlay" class="overlay" style="display: none;"><div class="modal-box"><h3>🏆 Suas Conquistas</h3><div id="achievements-list"></div><button type="button" id="close-achievements-btn" class="btn-secondary" style="margin-top: 20px;">Fechar</button></div></div>
+    
+    <div id="shopping-list-overlay" class="overlay" style="display: none;">
         <div class="modal-box">
-            <h3>Bem-vindo(a) ao Diário de Peso!</h3>
-            <p>Para começar, preencha seus dados.</p>
-            <form id="login-form">
-                <div class="form-group"><input type="text" id="name-input" placeholder="Seu nome" required autofocus></div>
-                <div class="form-group"><input type="number" step="0.01" id="height-input" placeholder="Sua altura em metros (Ex: 1.75)"></div>
-                <button type="submit" style="margin-top: 15px;">Entrar</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="meta-overlay" class="overlay" style="display: none;">
-        <div class="modal-box">
-            <h3>Definir Meta de Peso</h3>
-            <form id="meta-form">
-                <div class="form-group"><input type="number" step="0.1" id="meta-input" placeholder="Peso desejado (Ex: 70.5)" required></div>
-                <button type="submit">Salvar Meta</button>
-                <button type="button" id="cancel-meta-btn" class="btn-secondary" style="margin-top: 10px;">Cancelar</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="donation-overlay" class="overlay" style="display: none;">
-        <div class="modal-box">
-            <h3>Obrigado por usar o Diário de Peso!</h3>
-            <p>Este é um projeto desenvolvido com carinho. Se ele tem sido útil para você, considere apoiar com um PIX de qualquer valor.</p>
-            <div class="support-content">
-                <p>Chave: <span class="pix-key">4716124e-6815-4f85-8248-d58f9c0822f8</span></p>
-                <button class="copy-pix-btn">Copiar Chave PIX</button>
+            <h3>🛒 Lista de Compras</h3>
+            <div class="shopping-tabs">
+                <button class="shopping-tab active" data-tab="current">Lista Atual</button>
+                <button class="shopping-tab" data-tab="history">Histórico</button>
             </div>
-            <button type="button" id="close-donation-btn" class="btn-secondary" style="margin-top: 10px;">Fechar</button>
+            <div id="shopping-tab-current" class="shopping-content active">
+                <form id="shopping-list-form">
+                    <input type="text" id="shopping-item-input" placeholder="Nome do item..." required>
+                    <input type="number" id="shopping-quantity-input" placeholder="Qtd" value="1" min="1" max="50">
+                    <input type="number" step="0.01" id="shopping-price-input" placeholder="Preço (R$)">
+                    <button type="submit" style="grid-column: 1 / -1;">Adicionar</button>
+                </form>
+                <ul class="shopping-list-container" id="shopping-list"></ul>
+                <div id="shopping-list-total">Total Previsto: R$ 0.00</div>
+                <div class="shopping-actions">
+                    <button type="button" id="generate-pdf-btn" class="btn-secondary">Gerar PDF da Lista</button>
+                    <button type="button" id="archive-purchase-btn" style="background-color: var(--cor-verde);">Finalizar e Arquivar</button>
+                </div>
+            </div>
+            <div id="shopping-tab-history" class="shopping-content">
+                <ul id="shopping-history-list"></ul>
+            </div>
+            <button type="button" id="close-shopping-list-btn" class="btn-secondary" style="margin-top: 20px;">Fechar</button>
         </div>
     </div>
 
     <div class="container" style="display: none;">
         <div id="user-info">
+            <button id="achievements-btn">🏆</button>
+            <button id="shopping-list-btn">🛒</button>
             <span id="user-greeting"></span>
+            <button id="theme-toggle-btn">☀️</button>
             <button id="logout-btn">Trocar Usuário</button>
         </div>
         <p id="welcome-message"></p>
@@ -142,6 +206,7 @@
         <form id="form-peso">
             <div class="form-group"><label for="data">Data:</label><input type="date" id="data" required></div>
             <div class="form-group"><label for="peso">Peso (kg):</label><input type="number" id="peso" step="0.01" placeholder="Ex: 65.55" required></div>
+            <div class="form-group"><label for="nota-input">Anotações (Opcional):</label><input type="text" id="nota-input" placeholder="Ex: Fiz caminhada, comi pizza..."></div>
             <button type="submit">Salvar Registro</button>
         </form>
         <div id="ultimos-registros-container" class="history-list" style="display: none;">
@@ -160,24 +225,25 @@
             <p>Chave: <span class="pix-key">4716124e-6815-4f85-8248-d58f9c0822f8</span></p>
             <button class="copy-pix-btn">Copiar Chave PIX</button>
         </div>
-    </div>
-    <div id="backup-section">
+        <div id="backup-section">
             <hr style="margin: 25px 0;">
             <h3>Backup e Restauração de Dados</h3>
-            <p style="font-size: 0.9em; color: #555;">Salve seus dados em um arquivo para não perdê-los ou para transferi-los para outro aparelho.</p>
+            <p style="font-size: 0.9em; color: var(--cor-cinza);">Salve seus dados em um arquivo para não perdê-los ou para transferi-los para outro aparelho.</p>
             <button id="export-btn">Exportar Dados (Backup)</button>
             <button id="import-btn" class="btn-secondary" style="margin-top: 10px;">Importar Dados (Restaurar)</button>
             <input type="file" id="import-file-input" style="display: none;" accept=".json, .txt">
         </div>
+    </div>
 
     <footer style="display: none;">
         Desenvolvido por <a href="https://wa.me/5519993562075" target="_blank" rel="noopener noreferrer">Valdinei Rodrigues</a>
     </footer>
+    
+    <div id="toast-notification"></div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             
-            // --- ETAPA 1: SELEÇÃO DE TODOS OS ELEMENTOS ---
             const loginOverlay = document.getElementById('login-overlay');
             const loginForm = document.getElementById('login-form');
             const nameInput = document.getElementById('name-input');
@@ -189,13 +255,47 @@
             const logoutBtn = document.getElementById('logout-btn');
             const donationOverlay = document.getElementById('donation-overlay');
             const closeDonationBtn = document.getElementById('close-donation-btn');
+            const welcomeBannerOverlay = document.getElementById('welcome-banner-overlay');
+            const closeWelcomeBannerBtn = document.getElementById('close-welcome-banner-btn');
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            const achievementsBtn = document.getElementById('achievements-btn');
+            const achievementsOverlay = document.getElementById('achievements-overlay');
+            const closeAchievementsBtn = document.getElementById('close-achievements-btn');
+            const achievementsList = document.getElementById('achievements-list');
+            const toastNotification = document.getElementById('toast-notification');
+            const shoppingListBtn = document.getElementById('shopping-list-btn');
+            const shoppingListOverlay = document.getElementById('shopping-list-overlay');
+            const closeShoppingListBtn = document.getElementById('close-shopping-list-btn');
+            const shoppingListForm = document.getElementById('shopping-list-form');
+            const shoppingItemInput = document.getElementById('shopping-item-input');
+            const shoppingPriceInput = document.getElementById('shopping-price-input');
+            const shoppingQuantityInput = document.getElementById('shopping-quantity-input');
+            const shoppingListUL = document.getElementById('shopping-list');
+            const shoppingListTotal = document.getElementById('shopping-list-total');
+            const archivePurchaseBtn = document.getElementById('archive-purchase-btn');
+            const shoppingTabs = document.querySelectorAll('.shopping-tab');
+            const shoppingContents = document.querySelectorAll('.shopping-content');
+            const shoppingHistoryList = document.getElementById('shopping-history-list');
+            const generatePdfBtn = document.getElementById('generate-pdf-btn');
 
-            // --- ETAPA 2: DEFINIÇÃO DE TODAS AS FUNÇÕES ---
+            const ALL_ACHIEVEMENTS = {
+                FIRST_ENTRY: { title: 'Iniciante', description: 'Você fez seu primeiro registro!', icon: '🌱' },
+                SEVEN_ENTRIES: { title: 'Consistência', description: 'Parabéns por fazer 7 registros!', icon: '🗓️' },
+                THIRTY_ENTRIES: { title: 'Foco Total', description: 'Uau! 30 registros no total!', icon: '🎯' },
+                LOSE_5KG: { title: 'Guerreiro(a) do Bronze', description: 'Você perdeu seus primeiros 5 kg!', icon: '🥉' },
+                LOSE_10KG: { title: 'Guerreiro(a) da Prata', description: 'Incrível! 10 kg perdidos!', icon: '🥈' },
+                GOAL_REACHED: { title: 'Meta Batida!', description: 'Você alcançou seu objetivo! Parabéns!', icon: '🏁' }
+            };
             
             const getDadosUsuario = (userName) => JSON.parse(localStorage.getItem(`dadosUsuario_${userName}`));
             const salvarDadosUsuario = (userName, data) => localStorage.setItem(`dadosUsuario_${userName}`, JSON.stringify(data));
             const getPesosSalvos = (userName) => JSON.parse(localStorage.getItem(`registrosDePeso_${userName}`)) || [];
             const salvarPesos = (userName, pesos) => localStorage.setItem(`registrosDePeso_${userName}`, JSON.stringify(pesos));
+            const getCurrentShoppingList = (userName) => JSON.parse(localStorage.getItem(`listaDeComprasAtual_${userName}`)) || [];
+            const saveCurrentShoppingList = (userName, list) => localStorage.setItem(`listaDeComprasAtual_${userName}`, JSON.stringify(list));
+            const getPurchaseHistory = (userName) => JSON.parse(localStorage.getItem(`historicoDeCompras_${userName}`)) || [];
+            const savePurchaseHistory = (userName, history) => localStorage.setItem(`historicoDeCompras_${userName}`, JSON.stringify(history));
+
             const formatarData = (dataString) => {
                 const data = new Date(dataString);
                 const options = { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' };
@@ -203,19 +303,88 @@
                 return dataFormatada.charAt(0).toUpperCase() + dataFormatada.slice(1);
             };
 
+            function calculateTotal(list) { return list.reduce((total, item) => total + ((item.price || 0) * (item.quantity || 1)), 0); }
+            
+            function renderShoppingList(userName) {
+                const list = getCurrentShoppingList(userName);
+                shoppingListUL.innerHTML = '';
+                list.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.dataset.index = index;
+                    li.innerHTML = `<span class="shopping-item-text ${item.done ? 'done' : ''}"><span class="shopping-item-quantity">(${item.quantity}x)</span> ${item.text}</span> <span class="shopping-item-price">${item.price ? `R$ ${item.price.toFixed(2)}` : ''}</span> <button class="delete-item-btn">✖</button>`;
+                    shoppingListUL.appendChild(li);
+                });
+                const total = calculateTotal(list);
+                shoppingListTotal.textContent = `Total Previsto: R$ ${total.toFixed(2)}`;
+            }
+
+            function renderPurchaseHistory(userName) {
+                const history = getPurchaseHistory(userName);
+                shoppingHistoryList.innerHTML = '';
+                [...history].reverse().forEach((purchase, index) => {
+                    const originalIndex = history.length - 1 - index;
+                    const purchaseDate = new Date(purchase.date).toLocaleDateString('pt-BR');
+                    const li = document.createElement('li');
+                    li.className = 'history-purchase-item';
+                    li.innerHTML = `<div class="history-purchase-summary"><span>${purchaseDate} - Total: R$ ${purchase.total.toFixed(2)}</span><span>▼</span></div><div class="history-purchase-details"><ul>${purchase.items.map(item => `<li>(${item.quantity}x) ${item.text} ${item.price ? `- R$ ${item.price.toFixed(2)}` : ''}</li>`).join('')}</ul><button class="btn-secondary reuse-list-btn" data-index="${originalIndex}" style="width: 100%; margin-top: 10px;">Reutilizar esta Lista</button></div>`;
+                    shoppingHistoryList.appendChild(li);
+                });
+            }
+
             const showApp = (userName) => {
                 loginOverlay.style.display = 'none';
                 mainContainer.style.display = 'block';
                 footer.style.display = 'block';
-                userGreeting.textContent = `Usuário: ${userName}`;
+                userGreeting.textContent = `${userName}`;
                 welcomeMessage.textContent = `Seja bem-vindo(a)!`;
                 iniciarApp(userName);
             };
 
+            function showToast(message) {
+                toastNotification.textContent = message;
+                toastNotification.classList.add('show');
+                setTimeout(() => { toastNotification.classList.remove('show'); }, 4000);
+            }
+
+            function checkAchievements(userName) {
+                const userData = getDadosUsuario(userName);
+                const pesos = getPesosSalvos(userName);
+                if (!userData || !pesos || pesos.length === 0) return;
+                const newAchievements = [];
+                if (!userData.conquistas) userData.conquistas = [];
+                const initialWeight = pesos[0].peso;
+                const currentWeight = pesos[pesos.length - 1].peso;
+                const totalLoss = initialWeight - currentWeight;
+                const goal = userData.meta;
+                if (!userData.conquistas.includes('FIRST_ENTRY') && pesos.length >= 1) newAchievements.push('FIRST_ENTRY');
+                if (!userData.conquistas.includes('SEVEN_ENTRIES') && pesos.length >= 7) newAchievements.push('SEVEN_ENTRIES');
+                if (!userData.conquistas.includes('THIRTY_ENTRIES') && pesos.length >= 30) newAchievements.push('THIRTY_ENTRIES');
+                if (!userData.conquistas.includes('LOSE_5KG') && totalLoss >= 5) newAchievements.push('LOSE_5KG');
+                if (!userData.conquistas.includes('LOSE_10KG') && totalLoss >= 10) newAchievements.push('LOSE_10KG');
+                if (!userData.conquistas.includes('GOAL_REACHED') && goal && currentWeight <= goal) newAchievements.push('GOAL_REACHED');
+                if (newAchievements.length > 0) {
+                    userData.conquistas.push(...newAchievements);
+                    salvarDadosUsuario(userName, userData);
+                    const achievementInfo = ALL_ACHIEVEMENTS[newAchievements[0]];
+                    showToast(`🏆 Conquista Desbloqueada: ${achievementInfo.title}`);
+                }
+            }
+
+            function renderAchievements(userName) {
+                const userData = getDadosUsuario(userName) || {};
+                const unlocked = userData.conquistas || [];
+                achievementsList.innerHTML = '';
+                for (const id in ALL_ACHIEVEMENTS) {
+                    const achievement = ALL_ACHIEVEMENTS[id];
+                    const isUnlocked = unlocked.includes(id);
+                    const item = document.createElement('div');
+                    item.className = `achievement-item ${isUnlocked ? 'unlocked' : 'locked'}`;
+                    item.innerHTML = `<div class="achievement-icon">${achievement.icon}</div><div class="achievement-details"><h4>${achievement.title}</h4><p>${achievement.description}</p></div>`;
+                    achievementsList.appendChild(item);
+                }
+            }
+            
             function iniciarApp(userName) {
-                const exportBtn = document.getElementById('export-btn');
-                const importBtn = document.getElementById('import-btn');
-                const importFileInput = document.getElementById('import-file-input');
                 const userDataOnStart = getDadosUsuario(userName);
                 if (userDataOnStart && userDataOnStart.dataPrimeiroUso && !userDataOnStart.popupDoacaoMostrado) {
                     const dataPrimeiroUso = new Date(userDataOnStart.dataPrimeiroUso);
@@ -228,10 +397,16 @@
                         salvarDadosUsuario(userName, userDataOnStart);
                     }
                 }
-
+                const DICAS_DO_DIA = ["💡 Dica: Lembre-se de beber pelo menos 2 litros de água hoje!","💡 Dica: Uma boa noite de sono é fundamental para o controle de peso.","💡 Dica: Já fez seu registro de peso hoje? Consistência é a chave!","💡 Dica: Pequenas caminhadas durante o dia fazem uma grande diferença.","💡 Dica: Frutas e vegetais são seus maiores aliados. Já comeu os seus hoje?","💡 Dica: Evite se pesar todos os dias. O peso flutua! Foque na tendência semanal."];
+                setTimeout(() => {
+                    const randomIndex = Math.floor(Math.random() * DICAS_DO_DIA.length);
+                    const dica = DICAS_DO_DIA[randomIndex];
+                    showToast(dica);
+                }, 2000);
                 const form = document.getElementById('form-peso');
                 const inputData = document.getElementById('data');
                 const inputPeso = document.getElementById('peso');
+                const notaInput = document.getElementById('nota-input');
                 const spanPesoInicial = document.getElementById('peso-inicial');
                 const spanPesoAtual = document.getElementById('peso-atual');
                 const strongEvolucaoTotal = document.getElementById('evolucao-total');
@@ -252,6 +427,9 @@
                 const metaForm = document.getElementById('meta-form');
                 const metaInput = document.getElementById('meta-input');
                 const cancelMetaBtn = document.getElementById('cancel-meta-btn');
+                const exportBtn = document.getElementById('export-btn');
+                const importBtn = document.getElementById('import-btn');
+                const importFileInput = document.getElementById('import-file-input');
                 inputData.valueAsDate = new Date();
                 let grafico; 
 
@@ -264,82 +442,47 @@
                     salvarDadosUsuario(userName, userData);
                     metaOverlay.style.display = 'none';
                     atualizarTela();
-                    // --- LÓGICA DE BACKUP E RESTAURAÇÃO ---
-               exportBtn.addEventListener('click', () => {
-                    const userData = getDadosUsuario(userName);
-                    const weightData = getPesosSalvos(userName);
-
-                    if (!userData && (!weightData || weightData.length === 0)) {
-                        alert('Não há dados para exportar!');
+                });
+                
+                generatePdfBtn.addEventListener('click', () => {
+                    const list = getCurrentShoppingList(userName);
+                    if (list.length === 0) {
+                        alert("A lista de compras está vazia para gerar um PDF!");
                         return;
                     }
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    doc.setFontSize(18);
+                    doc.text(`Lista de Compras - ${userName}`, 14, 22);
+                    doc.setFontSize(11);
+                    doc.setTextColor(100);
+                    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 28);
+                    const tableColumn = ["Qtd", "Item", "Preço (R$)", "Total Item (R$)", "Comprado"];
+                    const tableRows = [];
+                    list.forEach(item => {
+                        const itemTotal = (item.price || 0) * (item.quantity || 1);
+                        const itemData = [ item.quantity || 1, item.text, item.price ? item.price.toFixed(2) : '0.00', itemTotal.toFixed(2), item.done ? 'Sim' : 'Não' ];
+                        tableRows.push(itemData);
+                    });
 
-                    const allData = {
-                        user: userName,
-                        userData: userData || {},
-                        weightData: weightData || []
-                    };
-
-                    const dataStr = JSON.stringify(allData, null, 2);
-                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-                    const url = URL.createObjectURL(dataBlob);
-                    
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `backup_diario_de_peso_${userName}.json`;
-                    
-                    document.body.appendChild(link);
-                    link.click();
-                    
-                    // A MUDANÇA ESTÁ AQUI: Limpamos o link após uma pequena pausa
-                    setTimeout(() => {
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                    }, 100); // 100 milissegundos é o suficiente
-                });
-
-                importBtn.addEventListener('click', () => {
-                    importFileInput.click(); // Abre a janela de seleção de arquivo
-                });
-
-                importFileInput.addEventListener('change', (event) => {
-                    const file = event.target.files[0];
-                    if (!file) {
-                        return;
-                    }
-
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const importedData = JSON.parse(e.target.result);
-                            
-                            if (!importedData.user || importedData.userData === undefined || importedData.weightData === undefined) {
-                                throw new Error('Arquivo de backup inválido ou corrompido.');
-                            }
-                            
-                            if (importedData.user !== userName) {
-                                if (!confirm(`Atenção: este backup pertence ao usuário "${importedData.user}".\n\nDeseja importar estes dados para o seu perfil "${userName}"?`)) {
-                                    importFileInput.value = ''; // Limpa o input
-                                    return;
-                                }
-                            }
-
-                            if (confirm('Atenção: A importação irá substituir TODOS os seus dados atuais. Esta ação não pode ser desfeita. Deseja continuar?')) {
-                                salvarDadosUsuario(userName, importedData.userData);
-                                salvarPesos(userName, importedData.weightData);
-                                alert('Dados importados com sucesso!');
-                                location.reload(); // Recarrega a página para garantir que tudo seja atualizado
-                            }
-                        } catch (error) {
-                            alert('Erro ao importar o arquivo. Verifique se o arquivo é um backup válido.\n\nDetalhe: ' + error.message);
-                        } finally {
-                            importFileInput.value = '';
+                    let finalY;
+                    doc.autoTable({
+                        head: [tableColumn],
+                        body: tableRows,
+                        startY: 35,
+                        didDrawPage: function (data) {
+                            finalY = data.cursor.y;
                         }
-                    };
-                    reader.readAsText(file);
+                    });
+                    
+                    const total = calculateTotal(list);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`Total Previsto: R$ ${total.toFixed(2)}`, 14, finalY + 10);
+                    
+                    doc.save(`lista_de_compras_${userName}.pdf`);
                 });
-                });
-
+                
                 const getClassificacaoIMC = (imc) => {
                     if (!imc) return { texto: '--', classe: '' };
                     if (imc < 18.5) return { texto: 'Magreza', classe: 'imc-magreza' };
@@ -354,19 +497,17 @@
                     const userData = getDadosUsuario(userName) || {};
                     const altura = userData ? userData.altura : null;
                     const meta = userData ? userData.meta : null;
-
                     const temRegistros = pesos.length > 0;
                     const temMaisDeUmRegistro = pesos.length > 1;
                     graficoContainer.style.display = temMaisDeUmRegistro ? 'block' : 'none';
                     ultimosRegistrosContainer.style.display = temMaisDeUmRegistro ? 'block' : 'none';
                     pEvolucaoDetalhada.style.display = temMaisDeUmRegistro ? 'block' : 'none';
                     historicoCompletoContainer.style.display = temRegistros ? 'block' : 'none';
-
                     const pesoAtual = temRegistros ? pesos[pesos.length - 1].peso : null;
                     if(altura && pesoAtual) {
                         const imc = pesoAtual / (altura * altura);
                         const classificacao = getClassificacaoIMC(imc);
-                        spanImc.textContent = `${imc.toFixed(1)} - ${classificacao.texto}`;
+                        spanImc.textContent = imc.toFixed(1);
                         spanImc.className = classificacao.classe;
                     } else if (!altura && temRegistros) {
                         spanImc.textContent = 'Adicione sua altura';
@@ -374,7 +515,6 @@
                     } else {
                         spanImc.textContent = '--'; spanImc.className = '';
                     }
-
                     if(meta) {
                         spanMeta.textContent = `${meta.toFixed(2)} kg`;
                         if(pesoAtual) {
@@ -386,7 +526,6 @@
                     } else {
                         spanMeta.textContent = 'Nenhuma'; spanFaltaMeta.textContent = 'Clique no lápis para definir.';
                     }
-
                     if (!temRegistros) {
                         spanPesoInicial.textContent = '-- kg'; spanPesoAtual.textContent = '-- kg';
                         strongEvolucaoTotal.textContent = 'Registre seu peso para começar'; strongEvolucaoTotal.className = 'neutro';
@@ -408,14 +547,13 @@
                             pEvolucaoDetalhada.style.display = 'none';
                         }
                     }
-
                     if(temMaisDeUmRegistro) {
                         listaUltimosRegistros.innerHTML = '';
                         const ultimos5 = pesos.slice(-5).reverse();
                         ultimos5.forEach(registro => {
                             const li = document.createElement('li');
-                            const indexAtual = pesos.findIndex(p => p.data === registro.data && p.peso === registro.peso);
                             let variacaoHtml = '';
+                            const indexAtual = pesos.findIndex(p => p.data === registro.data && p.peso === registro.peso);
                             if (indexAtual > 0) {
                                 const pesoAnterior = pesos[indexAtual - 1].peso;
                                 const variacao = (registro.peso - pesoAnterior) * 1000;
@@ -424,93 +562,62 @@
                                     variacaoHtml = `<span class="variacao-diaria ${classe}">(${sinal}${Math.round(variacao)} g)</span>`;
                                 }
                             }
-                            li.innerHTML = `<div><strong>${formatarData(registro.data)}</strong></div><div>${registro.peso.toFixed(2)} kg ${variacaoHtml}</div>`;
+                            let notaHtml = registro.nota ? `<div class="note-display">${registro.nota}</div>` : '';
+                            li.innerHTML = `<div class="history-item-main"><div><strong>${formatarData(registro.data)}</strong></div><div>${registro.peso.toFixed(2)} kg ${variacaoHtml}</div></div>${notaHtml}`;
                             listaUltimosRegistros.appendChild(li);
                         });
                     }
-
                     listaHistoricoCompleto.innerHTML = '';
                     [...pesos].reverse().forEach((registro, index) => {
                         const li = document.createElement('li');
                         const originalIndex = pesos.length - 1 - index;
-                        li.innerHTML = `<span><strong>${formatarData(registro.data)}</strong> - ${registro.peso.toFixed(2)} kg</span><button class="remover-btn" data-index="${originalIndex}">Remover</button>`;
+                        let notaHtml = registro.nota ? `<div class="note-display">${registro.nota}</div>` : '';
+                        li.innerHTML = `<div class="history-item-main"><span><strong>${formatarData(registro.data)}</strong> - ${registro.peso.toFixed(2)} kg</span><button class="remover-btn" data-index="${originalIndex}">Remover</button></div>${notaHtml}`;
                         listaHistoricoCompleto.appendChild(li);
                     });
-                    
                     if (grafico) { grafico.destroy(); }
                     if (temMaisDeUmRegistro) {
                         const labels = pesos.map(p => new Date(p.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'}));
                         const data = pesos.map(p => p.peso);
                         grafico = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ label: 'Peso (kg)', data, borderColor: 'var(--cor-principal)', backgroundColor: 'rgba(26, 115, 232, 0.1)', fill: true, tension: 0.1 }] }, options: { scales: { y: { beginAtZero: false } } } });
                     }
+                    checkAchievements(userName);
                 }
-
-                form.addEventListener('submit', (e) => { e.preventDefault(); const p = getPesosSalvos(userName); p.push({ data: inputData.value, peso: parseFloat(inputPeso.value) }); salvarPesos(userName, p); form.reset(); inputData.valueAsDate = new Date(); atualizarTela(); });
-                historyListWrapper.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('remover-btn')) {
-                        const index = parseInt(e.target.getAttribute('data-index')); let p = getPesosSalvos(userName); p.splice(index, 1); salvarPesos(userName, p); atualizarTela();
-                    }
-                });
-                toggleHistoryBtn.addEventListener('click', () => {
-                    const isHidden = historyListWrapper.style.display === 'none';
-                    historyListWrapper.style.display = isHidden ? 'block' : 'none';
-                    toggleHistoryBtn.textContent = isHidden ? 'Ocultar Histórico Completo' : 'Mostrar Histórico Completo';
-                });
+                form.addEventListener('submit', (e) => { e.preventDefault(); const p = getPesosSalvos(userName); p.push({ data: inputData.value, peso: parseFloat(inputPeso.value), nota: notaInput.value.trim() }); salvarPesos(userName, p); form.reset(); inputData.valueAsDate = new Date(); atualizarTela(); });
+                historyListWrapper.addEventListener('click', (e) => { if (e.target.classList.contains('remover-btn')) { const index = parseInt(e.target.getAttribute('data-index')); let p = getPesosSalvos(userName); p.splice(index, 1); salvarPesos(userName, p); atualizarTela(); }});
+                toggleHistoryBtn.addEventListener('click', () => { const isHidden = historyListWrapper.style.display === 'none'; historyListWrapper.style.display = isHidden ? 'block' : 'none'; toggleHistoryBtn.textContent = isHidden ? 'Ocultar Histórico Completo' : 'Mostrar Histórico Completo'; });
+                exportBtn.addEventListener('click', () => { const userData = getDadosUsuario(userName); const weightData = getPesosSalvos(userName); if (!userData && (!weightData || weightData.length === 0)) { alert('Não há dados para exportar!'); return; } const allData = { user: userName, userData: userData || {}, weightData: weightData || [] }; const dataStr = JSON.stringify(allData, null, 2); const dataBlob = new Blob([dataStr], {type: 'application/json'}); const url = URL.createObjectURL(dataBlob); const link = document.createElement('a'); link.href = url; link.download = `backup_diario_de_peso_${userName}.json`; document.body.appendChild(link); link.click(); setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(url); }, 100); });
+                importBtn.addEventListener('click', () => { importFileInput.click(); });
+                importFileInput.addEventListener('change', (event) => { const file = event.target.files[0]; if (!file) { return; } const reader = new FileReader(); reader.onload = (e) => { try { const importedData = JSON.parse(e.target.result); if (!importedData.user || importedData.userData === undefined || importedData.weightData === undefined) { throw new Error('Arquivo de backup inválido ou corrompido.'); } if (importedData.user !== userName) { if (!confirm(`Atenção: este backup pertence ao usuário "${importedData.user}".\n\nDeseja importar estes dados para o seu perfil "${userName}"?`)) { importFileInput.value = ''; return; } } if (confirm('Atenção: A importação irá substituir TODOS os seus dados atuais. Esta ação não pode ser desfeita. Deseja continuar?')) { salvarDadosUsuario(userName, importedData.userData); salvarPesos(userName, importedData.weightData); alert('Dados importados com sucesso!'); location.reload(); } } catch (error) { alert('Erro ao importar o arquivo. Verifique se o arquivo é um backup válido.\n\nDetalhe: ' + error.message); } finally { importFileInput.value = ''; } }; reader.readAsText(file); });
 
                 atualizarTela();
             }
             
-            // --- ETAPA 3: EXECUÇÃO DA LÓGICA INICIAL E LISTENERS GLOBAIS ---
-            let currentUser = localStorage.getItem('currentUser');
-            if (currentUser) {
-                const userData = getDadosUsuario(currentUser) || {};
-                nameInput.value = currentUser;
-                if (userData.altura) {
-                    heightInput.placeholder = `Altura salva: ${userData.altura} m`;
-                    heightInput.value = '';
-                }
-                showApp(currentUser);
-            } else {
-                loginOverlay.style.display = 'flex';
-            }
+            const bannerShown = localStorage.getItem('welcomeBannerShown');
+            const showInitialScreen = () => { let user = localStorage.getItem('currentUser'); if (user) { const userData = getDadosUsuario(user) || {}; nameInput.value = user; if (userData.altura) { heightInput.placeholder = `Altura salva: ${userData.altura} m`; heightInput.value = ''; } showApp(user); } else { loginOverlay.style.display = 'flex'; } };
+            const updateTheme = () => { const isDarkMode = document.body.classList.contains('dark-mode'); if (isDarkMode) { themeToggleBtn.textContent = '☀️'; localStorage.setItem('theme', 'dark'); } else { themeToggleBtn.textContent = '🌙'; localStorage.setItem('theme', 'light'); } };
 
-            loginForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const userName = nameInput.value.trim();
-                const userHeight = parseFloat(heightInput.value);
-                if (userName) {
-                    localStorage.setItem('currentUser', userName);
-                    currentUser = userName;
-                    let userData = getDadosUsuario(userName) || {};
-                    if (!userData.dataPrimeiroUso) {
-                        userData.dataPrimeiroUso = new Date().toISOString();
-                    }
-                    if(userHeight && !isNaN(userHeight)) {
-                        userData.altura = userHeight;
-                    }
-                    salvarDadosUsuario(userName, userData);
-                    showApp(currentUser);
-                }
-            });
+            themeToggleBtn.addEventListener('click', () => { document.body.classList.toggle('dark-mode'); updateTheme(); });
+            achievementsBtn.addEventListener('click', () => { const currentUser = localStorage.getItem('currentUser'); if (currentUser) { renderAchievements(currentUser); achievementsOverlay.style.display = 'flex'; } });
+            closeAchievementsBtn.addEventListener('click', () => { achievementsOverlay.style.display = 'none'; });
+            
+            shoppingTabs.forEach(tab => { tab.addEventListener('click', () => { const targetTab = tab.dataset.tab; shoppingTabs.forEach(t => t.classList.remove('active')); shoppingContents.forEach(c => c.classList.remove('active')); tab.classList.add('active'); document.getElementById(`shopping-tab-${targetTab}`).classList.add('active'); if(targetTab === 'history') { const currentUser = localStorage.getItem('currentUser'); renderPurchaseHistory(currentUser); } }); });
+            shoppingListBtn.addEventListener('click', () => { const currentUser = localStorage.getItem('currentUser'); if (currentUser) { renderShoppingList(currentUser); shoppingListOverlay.style.display = 'flex'; } });
+            closeShoppingListBtn.addEventListener('click', () => { shoppingListOverlay.style.display = 'none'; });
+            shoppingListForm.addEventListener('submit', (e) => { e.preventDefault(); const currentUser = localStorage.getItem('currentUser'); const text = shoppingItemInput.value.trim(); const price = parseFloat(shoppingPriceInput.value) || 0; const quantity = parseInt(shoppingQuantityInput.value) || 1; if (text && currentUser) { const list = getCurrentShoppingList(currentUser); list.push({ text, price, quantity, done: false }); saveCurrentShoppingList(currentUser, list); renderShoppingList(currentUser); shoppingItemInput.value = ''; shoppingPriceInput.value = ''; shoppingQuantityInput.value = '1';} });
+            shoppingListUL.addEventListener('click', (e) => { const currentUser = localStorage.getItem('currentUser'); const targetLi = e.target.closest('li'); if (!targetLi || !currentUser) return; const index = parseInt(targetLi.dataset.index); let list = getCurrentShoppingList(currentUser); if (e.target.classList.contains('delete-item-btn')) { list.splice(index, 1); } else { list[index].done = !list[index].done; } saveCurrentShoppingList(currentUser, list); renderShoppingList(currentUser); });
+            archivePurchaseBtn.addEventListener('click', () => { const currentUser = localStorage.getItem('currentUser'); const currentList = getCurrentShoppingList(currentUser); if (currentUser && currentList.length > 0) { if (confirm('Tem certeza que deseja finalizar e arquivar esta compra? A lista atual será limpa.')) { const history = getPurchaseHistory(currentUser); const total = calculateTotal(currentList); history.push({ date: new Date().toISOString(), total: total, items: currentList }); savePurchaseHistory(currentUser, history); saveCurrentShoppingList(currentUser, []); renderShoppingList(currentUser); showToast("Compra arquivada com sucesso!"); } } else { alert("A lista de compras está vazia!"); } });
+            shoppingHistoryList.addEventListener('click', (e) => { const currentUser = localStorage.getItem('currentUser'); if (e.target.closest('.history-purchase-summary')) { const details = e.target.closest('.history-purchase-summary').nextElementSibling; details.style.display = details.style.display === 'block' ? 'none' : 'block'; } if (e.target.classList.contains('reuse-list-btn')) { if (confirm('Isso irá substituir sua lista de compras atual. Deseja continuar?')) { const index = parseInt(e.target.dataset.index); const history = getPurchaseHistory(currentUser); const itemsToReuse = history[index].items.map(item => ({...item, done: false})); saveCurrentShoppingList(currentUser, itemsToReuse); document.querySelector('.shopping-tab[data-tab="current"]').click(); renderShoppingList(currentUser); showToast("Lista reutilizada com sucesso!"); } } });
 
-            logoutBtn.addEventListener('click', () => {
-                localStorage.removeItem('currentUser');
-                location.reload();
-            });
+            if (localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-mode'); }
+            updateTheme();
+            if (!bannerShown) { welcomeBannerOverlay.style.display = 'flex'; } else { showInitialScreen(); }
 
-            closeDonationBtn.addEventListener('click', () => {
-                donationOverlay.style.display = 'none';
-            });
-
-            document.querySelectorAll('.copy-pix-btn').forEach(button => {
-                button.addEventListener('click', () => {
-                    const pixKeySpan = button.parentElement.querySelector('.pix-key');
-                    navigator.clipboard.writeText(pixKeySpan.textContent).then(() => {
-                        button.textContent = 'Copiado!';
-                        setTimeout(() => { button.textContent = 'Copiar Chave PIX'; }, 2000);
-                    });
-                });
-            });
+            closeWelcomeBannerBtn.addEventListener('click', () => { welcomeBannerOverlay.style.display = 'none'; localStorage.setItem('welcomeBannerShown', 'true'); showInitialScreen(); });
+            loginForm.addEventListener('submit', (e) => { e.preventDefault(); const userName = nameInput.value.trim(); const userHeight = parseFloat(heightInput.value); if (userName) { localStorage.setItem('currentUser', userName); let userData = getDadosUsuario(userName) || {}; if (!userData.dataPrimeiroUso) { userData.dataPrimeiroUso = new Date().toISOString(); } if (!userData.conquistas) { userData.conquistas = []; } if(userHeight && !isNaN(userHeight)) { userData.altura = userHeight; } salvarDadosUsuario(userName, userData); showApp(userName); } });
+            logoutBtn.addEventListener('click', () => { localStorage.removeItem('currentUser'); location.reload(); });
+            closeDonationBtn.addEventListener('click', () => { donationOverlay.style.display = 'none'; });
+            document.querySelectorAll('.copy-pix-btn').forEach(button => { button.addEventListener('click', () => { const pixKeySpan = button.closest('.support-content').querySelector('.pix-key'); navigator.clipboard.writeText(pixKeySpan.textContent).then(() => { button.textContent = 'Copiado!'; setTimeout(() => { button.textContent = 'Copiar Chave PIX'; }, 2000); }); }); });
         });
     </script>
 </body>
